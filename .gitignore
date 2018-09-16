@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+
+# Project
+.cproject
+.mxproject
+.project
+.settings/*
+/Debug/*
