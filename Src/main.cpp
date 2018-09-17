@@ -49,12 +49,32 @@
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
+hal::SerialPort serial_port{
+  USART1,
+  DMA2, LL_DMA_STREAM_2,
+  DMA2, LL_DMA_STREAM_7,
+};
+
+
+hal::DigitalOutputPin spindle_enable_pin{DQ_0_GPIO_Port, DQ_0_Pin};
+hal::DigitalOutputPin spindle_direction_pin{DQ_1_GPIO_Port, DQ_1_Pin};
+hal::PwmPin spindle_speed_pin{TIM3, LL_TIM_CHANNEL_CH4}; //DQ2
+
+grbl::SpindleControl spindle_control {
+  spindle_enable_pin,
+  spindle_direction_pin,
+  spindle_speed_pin,
+  1000,
+  100
+};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 static void LL_Init(void);
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
@@ -68,6 +88,7 @@ static void MX_TIM3_Init(void);
 
 /* USER CODE END 0 */
 
+
 /**
   * @brief  The application entry point.
   *
@@ -76,6 +97,9 @@ static void MX_TIM3_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+  static uint8_t b;
+  static uint8_t data[100];
+  static uint32_t idx = 0;
 
   /* USER CODE END 1 */
 
@@ -97,34 +121,49 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-  LL_SYSTICK_EnableIT();
-  LL_TIM_EnableCounter(TIM3);
-  LL_TIM_EnableAllOutputs(TIM3);
+//  LL_SYSTICK_EnableIT();
+//  LL_TIM_EnableCounter(TIM3);
+//  LL_TIM_EnableAllOutputs(TIM3);
 
 
-  hal::SerialPort serial_port(115200);
+//  hal::SerialPort serial_port(115200);
+//
+//  hal::DigitalOutputPin spindle_enable_pin(DQ_0_GPIO_Port, DQ_0_Pin);
+//  hal::DigitalOutputPin spindle_direction_pin(DQ_1_GPIO_Port, DQ_1_Pin);
+//  hal::PwmPin spindle_speed_pin(TIM3, LL_TIM_CHANNEL_CH4); //DQ2
+//
+//  grbl::SpindleControl spindle(
+//      spindle_enable_pin,
+//      spindle_direction_pin,
+//      spindle_speed_pin,
+//      1000,
+//      100);
 
-  hal::DigitalOutputPin spindle_enable_pin(DQ_0_GPIO_Port, DQ_0_Pin);
-  hal::DigitalOutputPin spindle_direction_pin(DQ_1_GPIO_Port, DQ_1_Pin);
-  hal::PwmPin spindle_speed_pin(TIM3, LL_TIM_CHANNEL_CH4); //DQ2
-
-
-  grbl::SpindleControl spindle(
-      spindle_enable_pin,
-      spindle_direction_pin,
-      spindle_speed_pin,
-      1000,
-      100);
+  serial_port.Open(115200);
    /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+//  char str[] = "Ana are";
+  char str[] = "Andreea are mere frumoase si zemoase!\n";
+  uint32_t i = 0;
+  while(str[i] != 0) {
+    while(!serial_port.Write(str[i]));
+    i++;
+  }
 
+  while(1) {
+    if(serial_port.Read(b)) {
+//      data[idx++] = b;
+      serial_port.Write(b);
+    }
+  }
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
@@ -132,6 +171,7 @@ int main(void)
   /* USER CODE END 3 */
 
 }
+
 
 static void LL_Init(void)
 {
@@ -337,6 +377,46 @@ static void MX_USART1_UART_Init(void)
   GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /* USART1 DMA Init */
+
+  /* USART1_RX Init */
+  LL_DMA_SetChannelSelection(DMA2, LL_DMA_STREAM_2, LL_DMA_CHANNEL_4);
+
+  LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_STREAM_2, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+
+  LL_DMA_SetStreamPriorityLevel(DMA2, LL_DMA_STREAM_2, LL_DMA_PRIORITY_LOW);
+
+  LL_DMA_SetMode(DMA2, LL_DMA_STREAM_2, LL_DMA_MODE_CIRCULAR);
+
+  LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_STREAM_2, LL_DMA_PERIPH_NOINCREMENT);
+
+  LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_STREAM_2, LL_DMA_MEMORY_INCREMENT);
+
+  LL_DMA_SetPeriphSize(DMA2, LL_DMA_STREAM_2, LL_DMA_PDATAALIGN_BYTE);
+
+  LL_DMA_SetMemorySize(DMA2, LL_DMA_STREAM_2, LL_DMA_MDATAALIGN_BYTE);
+
+  LL_DMA_DisableFifoMode(DMA2, LL_DMA_STREAM_2);
+
+  /* USART1_TX Init */
+  LL_DMA_SetChannelSelection(DMA2, LL_DMA_STREAM_7, LL_DMA_CHANNEL_4);
+
+  LL_DMA_SetDataTransferDirection(DMA2, LL_DMA_STREAM_7, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+
+  LL_DMA_SetStreamPriorityLevel(DMA2, LL_DMA_STREAM_7, LL_DMA_PRIORITY_LOW);
+
+  LL_DMA_SetMode(DMA2, LL_DMA_STREAM_7, LL_DMA_MODE_NORMAL);
+
+  LL_DMA_SetPeriphIncMode(DMA2, LL_DMA_STREAM_7, LL_DMA_PERIPH_NOINCREMENT);
+
+  LL_DMA_SetMemoryIncMode(DMA2, LL_DMA_STREAM_7, LL_DMA_MEMORY_INCREMENT);
+
+  LL_DMA_SetPeriphSize(DMA2, LL_DMA_STREAM_7, LL_DMA_PDATAALIGN_BYTE);
+
+  LL_DMA_SetMemorySize(DMA2, LL_DMA_STREAM_7, LL_DMA_MDATAALIGN_BYTE);
+
+  LL_DMA_DisableFifoMode(DMA2, LL_DMA_STREAM_7);
+
   /* USART1 interrupt Init */
   NVIC_SetPriority(USART1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
   NVIC_EnableIRQ(USART1_IRQn);
@@ -353,6 +433,25 @@ static void MX_USART1_UART_Init(void)
   LL_USART_ConfigAsyncMode(USART1);
 
   LL_USART_Enable(USART1);
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+  /* Init with LL driver */
+  /* DMA controller clock enable */
+  LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA2);
+
+  /* DMA interrupt init */
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  NVIC_SetPriority(DMA2_Stream2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  NVIC_SetPriority(DMA2_Stream7_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -449,6 +548,14 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+* @brief This function handles DMA2 stream7 global interrupt.
+*/
+extern "C" void DMA2_Stream7_IRQHandler(void)
+{
+  serial_port.ISR();
+}
 
 /* USER CODE END 4 */
 
